@@ -1,0 +1,6 @@
+{
+  "name": "Forge Estimating — Moulton Lumber Group",
+  "description": "An elegant construction estimating, plan requirements, and dispatch tracker licensed to Adam Moulton of Moulton Lumber Group.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
