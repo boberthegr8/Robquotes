@@ -1,6 +1,6 @@
 {
-  "name": "Forge Estimating — Moulton Lumber Group",
-  "description": "An elegant construction estimating, plan requirements, and dispatch tracker licensed to Adam Moulton of Moulton Lumber Group.",
+  "name": "Forge Reader",
+  "description": "Forge construction document intake and structured analysis. Private PDF storage, deduplication and tenant-scoped analysis records through Forge Core.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": ["FORGE_CORE_DOCUMENT_INTAKE"]
 }
