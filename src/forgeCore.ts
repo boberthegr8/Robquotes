@@ -132,8 +132,6 @@ export async function getReaderContext(): Promise<ReaderContext | null> {
   };
 }
 
-const text = (value: unknown) => String(value ?? '').trim();
-
 export async function loadReaderWorkspace(): Promise<ReaderWorkspace> {
   const context = await getReaderContext();
   if (!context?.organizationId) return { context, customers: [], projects: [], documents: [] };
@@ -232,53 +230,31 @@ export async function uploadReaderDocument(file: File, options: {
   if (uploadError) throw uploadError;
 
   try {
-    const { error: documentError } = await client.from('documents').insert({
-      id: documentId,
-      organization_id: context.organizationId,
-      location_id: context.locationId || null,
-      project_id: options.projectId || null,
-      customer_id: options.customerId || null,
-      document_type: options.documentType || 'drawing_set',
-      title: text(options.title) || file.name,
-      original_filename: file.name,
-      storage_bucket: FORGE_CORE_CONFIG.documentBucket,
-      storage_path: storagePath,
-      mime_type: file.type || 'application/pdf',
-      file_size_bytes: file.size,
-      sha256,
-      status: 'uploaded',
-      source: 'forge-reader',
-      metadata: { reader_version: 1 },
-      created_by: context.userId
+    const { data, error } = await client.rpc('commit_reader_document_v1', {
+      p_document_id: documentId,
+      p_organization_id: context.organizationId,
+      p_location_id: context.locationId || null,
+      p_project_id: options.projectId || null,
+      p_customer_id: options.customerId || null,
+      p_document_type: options.documentType || 'drawing_set',
+      p_title: options.title?.trim() || file.name,
+      p_original_filename: file.name,
+      p_storage_bucket: FORGE_CORE_CONFIG.documentBucket,
+      p_storage_path: storagePath,
+      p_mime_type: file.type || 'application/pdf',
+      p_file_size_bytes: file.size,
+      p_sha256: sha256
     });
-    if (documentError) throw documentError;
+    if (error) throw error;
 
-    const { data: analysis, error: analysisError } = await client.from('document_analysis_runs').insert({
-      organization_id: context.organizationId,
-      location_id: context.locationId || null,
-      document_id: documentId,
-      project_id: options.projectId || null,
-      analysis_type: 'reader_intake',
-      status: 'queued',
-      parser: 'forge-reader-v1',
-      extracted_data: {},
-      warnings: [],
-      created_by: context.userId
-    }).select('id').single();
-    if (analysisError) throw analysisError;
+    const result = data?.[0];
+    if (!result) throw new Error('Forge Core did not return a Reader intake result.');
+    if (result.duplicate) {
+      await client.storage.from(FORGE_CORE_CONFIG.documentBucket).remove([storagePath]);
+      return { duplicate: true, documentId: result.document_id, analysisRunId: result.analysis_run_id };
+    }
 
-    await client.from('events').insert({
-      organization_id: context.organizationId,
-      location_id: context.locationId || null,
-      entity_type: 'document',
-      entity_id: documentId,
-      action: 'reader_uploaded',
-      payload: { analysis_run_id: analysis.id, filename: file.name, sha256 },
-      source: 'forge-reader',
-      actor_user_id: context.userId
-    });
-
-    return { duplicate: false, documentId, analysisRunId: analysis.id };
+    return { duplicate: false, documentId: result.document_id, analysisRunId: result.analysis_run_id };
   } catch (error) {
     await client.storage.from(FORGE_CORE_CONFIG.documentBucket).remove([storagePath]);
     throw error;
