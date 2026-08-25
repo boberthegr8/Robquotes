@@ -1,0 +1,39 @@
+name: Apply Forge Suite Navigation
+
+on:
+  push:
+    branches:
+      - feature/forge-suite-nav-v1
+    paths:
+      - scripts/patch_forge_suite_nav.py
+      - .github/workflows/apply-forge-suite-nav.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch Reader navigation
+        run: python scripts/patch_forge_suite_nav.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Reader
+        run: npm run build
+      - name: Commit patched Reader navigation
+        run: |
+          if git diff --quiet; then
+            echo "No navigation changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "Apply shared Forge Suite navigation to Reader"
+          git push
