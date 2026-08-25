@@ -53,6 +53,27 @@ const StatusPill: React.FC<{ document: ReaderDocument }> = ({ document }) => {
   return <span className={`reader-pill reader-pill-${status.tone}`}>{status.label}</span>;
 };
 
+const AnalysisCell: React.FC<{ document: ReaderDocument }> = ({ document }) => {
+  const data: any = document.analysis?.extractedData || {};
+  const sections = Array.isArray(data.detected_sections) ? data.detected_sections.slice(0, 3) : [];
+  const sheets = Array.isArray(data.sheet_numbers) ? data.sheet_numbers : [];
+  return (
+    <div className="min-w-[190px]">
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusPill document={document} />
+        {document.analysis?.pageCount ? <span className="text-[10px] reader-muted">{document.analysis.pageCount} pages</span> : null}
+      </div>
+      {sections.length > 0 && (
+        <div className="text-[10px] reader-secondary mt-2 leading-4">
+          {sections.map((section: any) => section.label).join(' • ')}
+        </div>
+      )}
+      {sheets.length > 0 && <div className="text-[9px] reader-muted mt-1">Sheets: {sheets.slice(0, 5).join(', ')}{sheets.length > 5 ? '…' : ''}</div>}
+      {document.analysis?.warnings?.length ? <div className="text-[9px] text-amber-300/80 mt-1">{document.analysis.warnings.length} warning{document.analysis.warnings.length === 1 ? '' : 's'}</div> : null}
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [workspace, setWorkspace] = useState<ReaderWorkspace>({ context: null, customers: [], projects: [], documents: [] });
@@ -154,8 +175,12 @@ const App: React.FC = () => {
       });
       if (result.duplicate) {
         setMessage(`Duplicate detected. ${file.name} already exists in Forge Core, so Reader did not upload another copy.`);
+      } else if (result.analysisStatus === 'completed') {
+        setMessage(`${file.name} is stored in Forge Core and Reader completed a ${result.analysis?.pageCount || ''}-page deterministic text/signal analysis.`);
+      } else if (result.analysisStatus === 'review') {
+        setMessage(`${file.name} is safely stored. Reader found limited machine-readable text, so the document is flagged for review/vision analysis.`);
       } else {
-        setMessage(`${file.name} is stored privately in Forge Core and queued for Reader analysis.`);
+        setMessage(`${file.name} is safely stored in Forge Core, but the deterministic analysis pass needs attention.`);
       }
       setUploadTitle('');
       await refresh();
@@ -295,9 +320,9 @@ const App: React.FC = () => {
                     type="button"
                   >
                     {busy ? <RefreshCw size={28} className="animate-spin reader-accent" /> : <UploadCloud size={30} className="reader-accent" />}
-                    <span className="font-black text-white mt-3">{busy ? 'Uploading to Forge Core…' : 'Drop PDF here'}</span>
+                    <span className="font-black text-white mt-3">{busy ? 'Uploading & analyzing…' : 'Drop PDF here'}</span>
                     <span className="text-xs reader-muted mt-1">or click to choose a file</span>
-                    <span className="text-[10px] reader-muted mt-3">SHA-256 dedupe • private tenant storage • reviewable analysis run</span>
+                    <span className="text-[10px] reader-muted mt-3">SHA-256 dedupe • private tenant storage • deterministic PDF text/signals</span>
                   </button>
                   <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={event => void ingestFile(event.target.files?.[0])} />
                 </div>
@@ -325,13 +350,13 @@ const App: React.FC = () => {
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[900px] text-left">
+                      <table className="w-full min-w-[1050px] text-left">
                         <thead>
                           <tr className="reader-table-head">
                             <th>Document</th>
                             <th>Customer / Project</th>
                             <th>Type</th>
-                            <th>Analysis</th>
+                            <th>Analysis evidence</th>
                             <th>Size</th>
                             <th>Added</th>
                           </tr>
@@ -353,7 +378,7 @@ const App: React.FC = () => {
                                 <div className="text-[10px] reader-muted mt-1 flex items-center gap-1"><FolderOpen size={11} />{document.projectName || 'Intake / no project'}</div>
                               </td>
                               <td><span className="text-xs reader-secondary">{document.documentType.replaceAll('_', ' ')}</span></td>
-                              <td><StatusPill document={document} /></td>
+                              <td><AnalysisCell document={document} /></td>
                               <td className="text-xs reader-secondary">{formatBytes(document.fileSizeBytes)}</td>
                               <td className="text-xs reader-secondary">{formatDate(document.createdAt)}</td>
                             </tr>
@@ -367,10 +392,10 @@ const App: React.FC = () => {
 
               <section className="reader-card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs font-black text-white">Reader v1 boundary</div>
-                  <div className="text-[11px] reader-muted mt-1">This release makes intake/storage/status real. The next worker will parse PDF metadata/drawing content into `document_analysis_runs.extracted_data`, then feed Scope.</div>
+                  <div className="text-xs font-black text-white">Reader analysis v1 is live</div>
+                  <div className="text-[11px] reader-muted mt-1">Machine-readable PDFs now produce bounded page text, sheet numbers, scales, detected plans/elevations/sections/schedules and issue signals in Core. Low-text/scanned sets are deliberately flagged for the vision/OCR worker instead of being guessed.</div>
                 </div>
-                <div className="reader-pill reader-pill-accent whitespace-nowrap">Reader → Scope contract next</div>
+                <div className="reader-pill reader-pill-accent whitespace-nowrap">Vision + Scope handoff next</div>
               </section>
             </>
           )}
