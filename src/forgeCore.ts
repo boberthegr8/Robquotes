@@ -1,3 +1,5 @@
+import { analyzePdfLocally, ReaderAnalysisOutput } from './readerAnalysis';
+
 export const FORGE_CORE_CONFIG = {
   url: 'https://uyqanhwurngoupmvzxrh.supabase.co',
   publishableKey: 'sb_publishable_SquKrj848EoO9NHZknVkSA_k8CKD7WQ',
@@ -53,6 +55,8 @@ export interface ReaderDocument {
     warnings: unknown[];
     errorMessage?: string;
     createdAt: string;
+    extractedData?: Record<string, unknown>;
+    parser?: string;
   };
 }
 
@@ -141,7 +145,7 @@ export async function loadReaderWorkspace(): Promise<ReaderWorkspace> {
     client.from('customers').select('id,display_name').eq('organization_id', context.organizationId).order('display_name'),
     client.from('projects').select('id,name,customer_id').eq('organization_id', context.organizationId).order('created_at', { ascending: false }),
     client.from('documents').select('id,title,original_filename,document_type,status,created_at,project_id,customer_id,sha256,file_size_bytes,storage_path').eq('organization_id', context.organizationId).order('created_at', { ascending: false }).limit(200),
-    client.from('document_analysis_runs').select('id,document_id,status,analysis_type,page_count,warnings,error_message,created_at').eq('organization_id', context.organizationId).order('created_at', { ascending: false }).limit(500)
+    client.from('document_analysis_runs').select('id,document_id,status,analysis_type,page_count,warnings,error_message,created_at,extracted_data,parser').eq('organization_id', context.organizationId).order('created_at', { ascending: false }).limit(500)
   ]);
   for (const result of [customerResult, projectResult, documentResult, analysisResult]) if (result.error) throw result.error;
 
@@ -182,7 +186,9 @@ export async function loadReaderWorkspace(): Promise<ReaderWorkspace> {
         pageCount: run.page_count || undefined,
         warnings: Array.isArray(run.warnings) ? run.warnings : [],
         errorMessage: run.error_message || undefined,
-        createdAt: run.created_at
+        createdAt: run.created_at,
+        extractedData: run.extracted_data || {},
+        parser: run.parser || undefined
       } : undefined
     };
   });
@@ -198,6 +204,45 @@ async function sha256File(file: File) {
 
 function safeFilename(name: string) {
   return name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'document.pdf';
+}
+
+async function finalizeAnalysis(analysisRunId: string, output: ReaderAnalysisOutput) {
+  const client = await getForgeCoreClient();
+  const { error } = await client.rpc('finalize_reader_analysis_v1', {
+    p_analysis_run_id: analysisRunId,
+    p_status: output.status,
+    p_parser: output.parser,
+    p_page_count: output.pageCount,
+    p_extracted_data: output.extractedData,
+    p_warnings: output.warnings,
+    p_error_message: null
+  });
+  if (error) throw error;
+}
+
+async function markAnalysisFailed(analysisRunId: string, errorMessage: string) {
+  const client = await getForgeCoreClient();
+  const { error } = await client.rpc('finalize_reader_analysis_v1', {
+    p_analysis_run_id: analysisRunId,
+    p_status: 'failed',
+    p_parser: 'pdfjs-text-signals-v1',
+    p_page_count: null,
+    p_extracted_data: {},
+    p_warnings: ['Reader could not complete deterministic PDF text analysis.'],
+    p_error_message: errorMessage.slice(0, 1200)
+  });
+  if (error) console.error('Reader could not mark analysis failed.', error);
+}
+
+export async function analyzeReaderFile(file: File, analysisRunId: string) {
+  try {
+    const output = await analyzePdfLocally(file);
+    await finalizeAnalysis(analysisRunId, output);
+    return output;
+  } catch (error: any) {
+    await markAnalysisFailed(analysisRunId, error?.message || 'Unknown Reader analysis error.');
+    throw error;
+  }
 }
 
 export async function uploadReaderDocument(file: File, options: {
@@ -254,7 +299,20 @@ export async function uploadReaderDocument(file: File, options: {
       return { duplicate: true, documentId: result.document_id, analysisRunId: result.analysis_run_id };
     }
 
-    return { duplicate: false, documentId: result.document_id, analysisRunId: result.analysis_run_id };
+    let analysis: ReaderAnalysisOutput | undefined;
+    try {
+      analysis = await analyzeReaderFile(file, result.analysis_run_id);
+    } catch (analysisError) {
+      console.warn('Document was safely stored but deterministic Reader analysis failed.', analysisError);
+    }
+
+    return {
+      duplicate: false,
+      documentId: result.document_id,
+      analysisRunId: result.analysis_run_id,
+      analysisStatus: analysis?.status || 'failed',
+      analysis
+    };
   } catch (error) {
     await client.storage.from(FORGE_CORE_CONFIG.documentBucket).remove([storagePath]);
     throw error;
