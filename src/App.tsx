@@ -210,10 +210,13 @@ const App: React.FC = () => {
 
         <nav className="p-3 space-y-1 text-sm">
           <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-[.18em] reader-muted">Forge Suite</div>
+          <a className="reader-nav" href="https://forge2-navy.vercel.app"><span>Home</span><ChevronRight size={14} /></a>
           <a className="reader-nav" href="https://forge-crm-six.vercel.app"><span>CRM</span><ChevronRight size={14} /></a>
           <div className="reader-nav reader-nav-active"><span>Reader</span><span className="reader-dot" /></div>
           <a className="reader-nav" href="https://forge-scope.vercel.app"><span>Scope</span><ChevronRight size={14} /></a>
           <a className="reader-nav" href="https://lumber-estimator-ai.vercel.app"><span>Quote / AI Quoter</span><ChevronRight size={14} /></a>
+          <a className="reader-nav" href="https://forgemfg.vercel.app"><span>Manufacturing</span><ChevronRight size={14} /></a>
+          <a className="reader-nav" href="https://forge-portal-pi.vercel.app"><span>Portal</span><ChevronRight size={14} /></a>
         </nav>
 
         <div className="mt-auto p-4">
