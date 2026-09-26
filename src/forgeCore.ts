@@ -71,18 +71,19 @@ export async function getForgeCoreClient(): Promise<SupabaseClientLike> {
   if (!clientPromise) {
     clientPromise = import(/* @vite-ignore */ FORGE_CORE_CONFIG.supabaseJsUrl).then((module: any) =>
       module.createClient(FORGE_CORE_CONFIG.url, FORGE_CORE_CONFIG.publishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        auth: (window as any).ForgeSuite?.auth || { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       })
     );
   }
-  return clientPromise;
+  const client = await clientPromise;
+  return (window as any).ForgeSuite ? (window as any).ForgeSuite.connect(client) : client;
 }
 
 export async function sendReaderMagicLink(email: string) {
   const cleanEmail = email.trim();
   if (!cleanEmail) throw new Error('Enter your Forge email address.');
   const client = await getForgeCoreClient();
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const redirectTo = 'https://app.forgehub.dev/account.html';
   const { error } = await client.auth.signInWithOtp({
     email: cleanEmail,
     options: { shouldCreateUser: false, emailRedirectTo: redirectTo }
