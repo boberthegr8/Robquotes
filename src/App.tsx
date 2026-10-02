@@ -199,13 +199,13 @@ const App: React.FC = () => {
     <div className="min-h-screen reader-app">
       <aside className="reader-sidebar">
         <div className="px-5 pt-6 pb-5 border-b reader-border">
-          <div className="flex items-center gap-3">
+          <a href="https://app.forgehub.dev/" aria-label="Back to Forge Home" title="Back to Forge Home" style={{color: 'inherit', textDecoration: 'none'}} className="flex items-center gap-3">
             <div className="reader-logo">F</div>
             <div>
               <div className="font-black tracking-[.18em] text-sm text-white">FORGE</div>
               <div className="text-[10px] uppercase tracking-[.2em] reader-muted">Reader</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <nav className="p-3 space-y-1 text-sm">
