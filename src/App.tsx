@@ -218,6 +218,7 @@ const App: React.FC = () => {
           <a className="reader-nav" href="https://manufacturing.forgehub.dev"><span>Manufacturing</span><ChevronRight size={14} /></a>
           <a className="reader-nav" href="https://portal.forgehub.dev"><span>Portal</span><ChevronRight size={14} /></a>
           <a className="reader-nav" href="https://frame.forgehub.dev"><span>Frame · 3D Takeoff</span><ChevronRight size={14} /></a>
+          <a className="reader-nav" href="https://todo.forgehub.dev"><span>To Do</span><ChevronRight size={14} /></a>
         </nav>
 
         <div className="mt-auto p-4">
